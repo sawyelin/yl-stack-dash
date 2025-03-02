@@ -1,77 +1,134 @@
-# Dashboard Management System
+# SecureVault - Personal Dashboard Management System
+
+## Overview
+
+SecureVault is a comprehensive personal dashboard for organizing and managing digital assets with a clean, modern interface. It allows you to store and organize links, notes, credentials, and tagged items in a secure, user-friendly environment.
+
+## Features
+
+- **Card-based Dashboard**: Organize your digital assets in a visually appealing grid layout
+- **Multiple Item Types**: Store links, notes, credentials, and tagged items
+- **Secure Credential Storage**: Password-protect sensitive information
+- **Drag & Drop Organization**: Easily rearrange your dashboard items
+- **Responsive Design**: Works on desktop and mobile devices
+- **Dark/Light Mode**: Choose your preferred theme
+- **Custom Color Themes**: Personalize your dashboard appearance
+- **Tag-based Organization**: Filter items by tags for quick access
+- **Search Functionality**: Find items quickly with the search feature
+
+## Getting Started
+
+### Installation
+
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+### Building for Production
+
+```bash
+npm run build
+npm run preview
+```
 
 ## Storage Options
 
-This project supports two storage options:
+SecureVault supports two storage options:
 
-1. **Local SQLite Storage** - Data is stored in the browser using SQL.js
-2. **Cloudflare D1** - Data is stored in Cloudflare's D1 database service
+### 1. Local SQLite Storage (Default)
 
-## Local SQLite Setup
+By default, the application uses SQL.js to store data in the browser. This requires no additional setup and works entirely client-side.
 
-By default, the application uses local SQLite storage. No additional setup is required.
+**Benefits:**
+- No server required
+- Works offline
+- Data stays on the user's device
 
-## Cloudflare D1 Integration
+### 2. Cloudflare D1 Integration
 
-To use Cloudflare D1 as your database, follow these steps:
+For persistent cloud storage, you can connect to Cloudflare D1.
 
-### 1. Create a D1 Database
+#### Setup Steps:
 
-If you have Cloudflare Wrangler CLI installed:
+1. **Create a D1 Database**
+   ```bash
+   wrangler d1 create securevault-db
+   ```
 
-```bash
-wrangler d1 create dashboard-db
-```
+2. **Initialize the Schema**
+   ```bash
+   wrangler d1 execute securevault-db --file=./schema.sql
+   ```
 
-Or create a database through the Cloudflare Dashboard.
+3. **Configure Environment Variables**
+   Create a `.env.local` file with:
+   ```
+   VITE_USE_LOCAL_STORAGE=false
+   VITE_CF_API_URL=https://api.cloudflare.com/client/v4/accounts/YOUR_ACCOUNT_ID
+   VITE_CF_API_TOKEN=YOUR_API_TOKEN
+   VITE_CF_DATABASE_ID=YOUR_D1_DATABASE_ID
+   ```
 
-### 2. Initialize the Schema
+## Usage Guide
 
-Use the provided schema.sql file to initialize your database:
+### Adding Items
 
-```bash
-wrangler d1 execute dashboard-db --file=./schema.sql
-```
+1. Click the "+" button in the bottom right corner
+2. Select the item type (Link, Note, Credential, or Tagged Item)
+3. Fill in the required information
+4. Add tags for organization
+5. Click "Add Item"
 
-### 3. Configure Environment Variables
+### Managing Credentials
 
-Copy the .env.example file to .env.local and update the configuration:
+1. Toggle "Password Protected" when creating credential items
+2. When accessing protected credentials, enter the vault key
+3. View and copy the decrypted information
 
-```
-# Set to "false" to use Cloudflare D1 instead of local storage
-VITE_USE_LOCAL_STORAGE=false
+### Organizing Your Dashboard
 
-# Cloudflare D1 Configuration
-VITE_CF_API_URL=https://api.cloudflare.com/client/v4/accounts/YOUR_ACCOUNT_ID
-VITE_CF_API_TOKEN=YOUR_API_TOKEN
-VITE_CF_DATABASE_ID=YOUR_D1_DATABASE_ID
-```
+1. Drag and drop items to rearrange them
+2. Use the sidebar to filter by type or tag
+3. Use the search bar to find specific items
 
-- `YOUR_ACCOUNT_ID`: Your Cloudflare account ID
-- `YOUR_API_TOKEN`: A Cloudflare API token with D1 permissions
-- `YOUR_D1_DATABASE_ID`: The ID of your D1 database
+### Customizing Appearance
 
-### 4. Run the Application
+1. Toggle between dark and light mode using the theme switch
+2. Select a color theme from the settings panel
 
-```bash
-npm run dev
-```
+## Mobile Support
+
+SecureVault is fully responsive and optimized for mobile devices:
+
+- Bottom navigation bar for quick access to categories
+- Slide-out sidebar for additional options
+- Optimized modals and forms for touch input
+- Floating action button for adding new items
 
 ## Switching Storage Types
 
-You can switch between storage types in the application:
+You can toggle between storage options within the application:
 
 1. Open the settings panel in the sidebar
 2. Find the "Storage" section
-3. Click the "Toggle" button to switch between local SQLite and Cloudflare D1
+3. Click the "Toggle" button to switch between Local SQLite and Cloudflare D1
 
-Note: When switching storage types, your data will not be transferred between storage systems.
+**Note:** When switching storage types, your data will not be transferred between systems.
 
-## API Documentation
+## Technical Details
 
-The application uses a unified storage API that abstracts the underlying storage mechanism:
+- Built with React, TypeScript, and Vite
+- Uses Tailwind CSS for styling
+- Implements shadcn/ui components
+- Drag and drop powered by dnd-kit
+- Storage abstraction layer for multiple backends
 
-- For Cloudflare D1: Uses the Cloudflare API endpoints
-- For Local SQLite: Uses SQL.js to store data in the browser
+## License
 
-All database operations are wrapped in service functions in `src/services/widgetService.ts`.
+MIT
