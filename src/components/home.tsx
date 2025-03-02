@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Sidebar from "./layout/Sidebar";
+import MobileNavbar from "./layout/MobileNavbar";
 import DashboardGrid, { Widget } from "./dashboard/DashboardGrid";
 import ItemModal from "./modals/ItemModal";
 import CredentialAccessModal from "./modals/CredentialAccessModal";
@@ -368,18 +369,29 @@ const Home = () => {
 
   return (
     <div className="flex h-screen w-full bg-white dark:bg-gray-900">
-      {/* Sidebar */}
-      <Sidebar
+      {/* Desktop Sidebar - hidden on mobile */}
+      <div className="hidden lg:block">
+        <Sidebar
+          activeFilter={activeFilter}
+          onFilterChange={handleFilterChange}
+          onSearch={handleSearch}
+          isDarkMode={isDarkMode}
+          onThemeToggle={handleThemeToggle}
+          onColorThemeChange={handleColorThemeChange}
+        />
+      </div>
+
+      {/* Mobile Navigation */}
+      <MobileNavbar
         activeFilter={activeFilter}
         onFilterChange={handleFilterChange}
         onSearch={handleSearch}
         isDarkMode={isDarkMode}
         onThemeToggle={handleThemeToggle}
-        onColorThemeChange={handleColorThemeChange}
       />
 
       {/* Main Dashboard */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden pt-[60px] lg:pt-0 pb-[60px] lg:pb-0">
         <DashboardGrid
           widgets={filteredWidgets}
           onAddItem={handleAddItem}

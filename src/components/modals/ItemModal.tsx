@@ -142,7 +142,7 @@ const ItemModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] bg-white dark:bg-gray-800">
+      <DialogContent className="w-[95vw] max-w-[600px] bg-white dark:bg-gray-800 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {formData.type && getTypeIcon(formData.type)}

@@ -26,7 +26,9 @@ const AddItemButton = ({
   };
 
   return (
-    <div className={`fixed ${positionClasses[position]} z-10 bg-background`}>
+    <div
+      className={`fixed ${positionClasses[position]} z-10 bg-background lg:block hidden`}
+    >
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -44,6 +46,18 @@ const AddItemButton = ({
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
+
+      {/* Mobile floating action button */}
+      <div className="lg:hidden fixed bottom-20 right-4 z-50">
+        <Button
+          onClick={onClick}
+          size="icon"
+          className="h-14 w-14 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-r from-primary to-accent text-white"
+          aria-label="Add new item"
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
+      </div>
     </div>
   );
 };

@@ -117,7 +117,7 @@ const CredentialAccessModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 border-t-4 border-t-amber-500 dark:border-t-amber-400 rounded-t-none">
+      <DialogContent className="w-[95vw] max-w-md bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 border-t-4 border-t-amber-500 dark:border-t-amber-400 rounded-t-none">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
             <div className="p-2 rounded-full bg-amber-100 dark:bg-amber-900/50">

@@ -92,4 +92,25 @@
     content: "";
     @apply absolute inset-0 bg-gradient-to-br from-accent/10 to-primary/10 opacity-80;
   }
+
+  /* Mobile optimizations */
+  @media (max-width: 768px) {
+    .touch-manipulation {
+      touch-action: manipulation;
+    }
+
+    /* Improve tap targets on mobile */
+    button,
+    a,
+    [role="button"] {
+      @apply min-h-[44px] min-w-[44px];
+    }
+
+    /* Fix for mobile viewport height issues */
+    .h-screen {
+      height: 100vh; /* fallback */
+      height: -webkit-fill-available;
+      height: stretch;
+    }
+  }
 }

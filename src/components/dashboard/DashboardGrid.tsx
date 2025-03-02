@@ -179,7 +179,7 @@ const DashboardGrid = ({
           items={items.map((item) => item.id)}
           strategy={rectSortingStrategy}
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 auto-rows-fr">
             {items.map((widget) => (
               <SortableItem
                 key={widget.id}
