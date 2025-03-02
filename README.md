@@ -1,30 +1,52 @@
-# React + TypeScript + Vite
+# Dashboard Management System
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Cloudflare D1 Integration
 
-Currently, two official plugins are available:
+This project uses Cloudflare D1 as its database. Follow these steps to set up the database:
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### 1. Create a D1 Database
 
-## Expanding the ESLint configuration
+If you have Cloudflare Wrangler CLI installed:
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
-
-- Configure the top-level `parserOptions` property like this:
-
-```js
-export default {
-  // other rules...
-  parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    project: ['./tsconfig.json', './tsconfig.node.json'],
-    tsconfigRootDir: __dirname,
-  },
-}
+```bash
+wrangler d1 create dashboard-db
 ```
 
-- Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
-- Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
+Or create a database through the Cloudflare Dashboard.
+
+### 2. Initialize the Schema
+
+Use the provided schema.sql file to initialize your database:
+
+```bash
+wrangler d1 execute dashboard-db --file=./schema.sql
+```
+
+### 3. Configure Environment Variables
+
+Copy the .env.example file to .env.local and fill in your Cloudflare credentials:
+
+```
+VITE_CF_API_URL=https://api.cloudflare.com/client/v4/accounts/YOUR_ACCOUNT_ID
+VITE_CF_API_TOKEN=YOUR_API_TOKEN
+VITE_CF_DATABASE_ID=YOUR_D1_DATABASE_ID
+```
+
+- `YOUR_ACCOUNT_ID`: Your Cloudflare account ID
+- `YOUR_API_TOKEN`: A Cloudflare API token with D1 permissions
+- `YOUR_D1_DATABASE_ID`: The ID of your D1 database
+
+### 4. Run the Application
+
+```bash
+npm run dev
+```
+
+## API Documentation
+
+The application uses the following Cloudflare D1 endpoints:
+
+- `GET /d1/query` - For read operations
+- `POST /d1/execute` - For write operations
+
+These are wrapped in service functions in `src/services/widgetService.ts`.

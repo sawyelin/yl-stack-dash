@@ -50,119 +50,119 @@ const Home = () => {
     }
   }, [isDarkMode]);
 
-  // Simulate loading dashboard data from an API
+  // Load dashboard data from Cloudflare D1
   const loadDashboardData = async () => {
     setIsLoading(true);
     setDashboardError(null);
 
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-
-      // Sample data
-      const sampleData: Widget[] = [
-        {
-          id: "widget-1",
-          title: "Important Links",
-          content: "Collection of frequently used websites and resources",
-          type: "link",
-          tags: ["work", "resources"],
-          url: "https://example.com",
-          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // 7 days ago
-          updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-        },
-        {
-          id: "widget-2",
-          title: "Project Notes",
-          content:
-            "Notes for the current dashboard project including requirements and deadlines",
-          type: "note",
-          tags: ["project", "work"],
-          createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000), // 14 days ago
-          updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
-        },
-        {
-          id: "widget-3",
-          title: "Server Credentials",
-          content: "Login information for the development server",
-          type: "credential",
-          tags: ["server", "security"],
-          isProtected: true,
-          createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
-          updatedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), // 10 days ago
-        },
-        {
-          id: "widget-4",
-          title: "Personal Tasks",
-          content: "List of personal tasks and reminders",
-          type: "tagged",
-          tags: ["personal", "tasks"],
-          createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
-          updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
-        },
-        {
-          id: "widget-5",
-          title: "Documentation",
-          content: "Links to project documentation and API references",
-          type: "link",
-          tags: ["docs", "reference"],
-          url: "https://docs.example.com",
-          createdAt: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000), // 60 days ago
-          updatedAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000), // 15 days ago
-        },
-        {
-          id: "widget-6",
-          title: "Meeting Notes",
-          content: "Notes from the last team meeting including action items",
-          type: "note",
-          tags: ["meetings", "team"],
-          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
-          updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
-        },
-      ];
-
-      setWidgets(sampleData);
+      // Import dynamically to avoid issues with SSR
+      const { getAllWidgets } = await import("@/services/widgetService");
+      const data = await getAllWidgets();
+      setWidgets(data);
     } catch (error) {
       console.error("Error loading dashboard data:", error);
       setDashboardError(
-        "Failed to load dashboard data. Please try again later.",
+        error instanceof Error
+          ? error.message
+          : "Failed to load dashboard data. Please try again later.",
       );
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Filter widgets based on active filter and search query
-  const filteredWidgets = widgets.filter((widget) => {
-    // Filter by type
-    if (activeFilter === "links" && widget.type !== "link") return false;
-    if (activeFilter === "notes" && widget.type !== "note") return false;
-    if (activeFilter === "credentials" && widget.type !== "credential")
-      return false;
-    if (activeFilter === "tags" && widget.type !== "tagged") return false;
+  // State for filtered widgets
+  const [filteredWidgets, setFilteredWidgets] = useState<Widget[]>([]);
 
-    // Filter by tag
-    if (activeFilter.startsWith("tag:")) {
-      const tagFilter = activeFilter.replace("tag:", "");
-      if (!widget.tags.includes(tagFilter)) return false;
-    }
+  // Effect to handle filtering
+  useEffect(() => {
+    const filterWidgets = async () => {
+      setIsLoading(true);
+      try {
+        // If there's a search query, use the search API
+        if (searchQuery) {
+          const { searchWidgets } = await import("@/services/widgetService");
+          const results = await searchWidgets(searchQuery);
+          setFilteredWidgets(results);
+          return;
+        }
 
-    // Filter by search query
-    if (
-      searchQuery &&
-      !(
-        widget.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        widget.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        widget.tags.some((tag) =>
-          tag.toLowerCase().includes(searchQuery.toLowerCase()),
-        )
-      )
-    ) {
-      return false;
-    }
+        // Filter by type using the API
+        if (
+          activeFilter === "links" ||
+          activeFilter === "notes" ||
+          activeFilter === "credentials" ||
+          activeFilter === "tags"
+        ) {
+          const { getWidgetsByType } = await import("@/services/widgetService");
+          const type =
+            activeFilter === "links"
+              ? "link"
+              : activeFilter === "notes"
+                ? "note"
+                : activeFilter === "credentials"
+                  ? "credential"
+                  : "tagged";
+          const results = await getWidgetsByType(type);
+          setFilteredWidgets(results);
+          return;
+        }
 
-    return true;
-  });
+        // Filter by tag
+        if (activeFilter.startsWith("tag:")) {
+          const { getWidgetsByTag } = await import("@/services/widgetService");
+          const tagFilter = activeFilter.replace("tag:", "");
+          const results = await getWidgetsByTag(tagFilter);
+          setFilteredWidgets(results);
+          return;
+        }
+
+        // Default: show all widgets
+        setFilteredWidgets(widgets);
+      } catch (error) {
+        console.error("Error filtering widgets:", error);
+        // Fall back to client-side filtering if API fails
+        const filtered = widgets.filter((widget) => {
+          // Filter by type
+          if (activeFilter === "links" && widget.type !== "link") return false;
+          if (activeFilter === "notes" && widget.type !== "note") return false;
+          if (activeFilter === "credentials" && widget.type !== "credential")
+            return false;
+          if (activeFilter === "tags" && widget.type !== "tagged") return false;
+
+          // Filter by tag
+          if (activeFilter.startsWith("tag:")) {
+            const tagFilter = activeFilter.replace("tag:", "");
+            if (!widget.tags.includes(tagFilter)) return false;
+          }
+
+          // Filter by search query
+          if (
+            searchQuery &&
+            !(
+              widget.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              widget.content
+                .toLowerCase()
+                .includes(searchQuery.toLowerCase()) ||
+              widget.tags.some((tag) =>
+                tag.toLowerCase().includes(searchQuery.toLowerCase()),
+              )
+            )
+          ) {
+            return false;
+          }
+
+          return true;
+        });
+        setFilteredWidgets(filtered);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    filterWidgets();
+  }, [widgets, activeFilter, searchQuery]);
 
   // Authentication handlers
   const handleLogin = (values: { email: string; password: string }) => {
@@ -245,38 +245,76 @@ const Home = () => {
     }
   };
 
-  const handleDeleteItem = (id: string) => {
-    setWidgets(widgets.filter((widget) => widget.id !== id));
-    toast({
-      title: "Item deleted",
-      description: "The item has been removed from your dashboard",
-    });
+  const handleDeleteItem = async (id: string) => {
+    try {
+      const { deleteWidget } = await import("@/services/widgetService");
+      const success = await deleteWidget(id);
+
+      if (success) {
+        setWidgets(widgets.filter((widget) => widget.id !== id));
+        toast({
+          title: "Item deleted",
+          description: "The item has been removed from your dashboard",
+        });
+      } else {
+        throw new Error("Failed to delete item");
+      }
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete item. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleSaveItem = (item: Widget) => {
-    if (itemModalMode === "add") {
-      // Add new item with a unique ID and timestamps
-      const newItem = {
-        ...item,
-        id: `widget-${Date.now()}`,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      setWidgets([...widgets, newItem]);
+  const handleSaveItem = async (item: Widget) => {
+    try {
+      if (itemModalMode === "add") {
+        // Create new item in database
+        const { createWidget } = await import("@/services/widgetService");
+        const { id, title, content, type, tags, url, isProtected } = item;
+
+        const newItem = await createWidget({
+          title,
+          content,
+          type,
+          tags,
+          url,
+          isProtected,
+        });
+
+        setWidgets([...widgets, newItem]);
+        toast({
+          title: "Item added",
+          description: "New item has been added to your dashboard",
+        });
+      } else {
+        // Update existing item in database
+        const { updateWidget } = await import("@/services/widgetService");
+        const updatedItem = await updateWidget(item);
+
+        setWidgets(
+          widgets.map((widget) =>
+            widget.id === updatedItem.id ? updatedItem : widget,
+          ),
+        );
+
+        toast({
+          title: "Item updated",
+          description: "Your changes have been saved",
+        });
+      }
+    } catch (error) {
+      console.error("Error saving item:", error);
       toast({
-        title: "Item added",
-        description: "New item has been added to your dashboard",
-      });
-    } else {
-      // Update existing item with new timestamp
-      setWidgets(
-        widgets.map((widget) =>
-          widget.id === item.id ? { ...item, updatedAt: new Date() } : widget,
-        ),
-      );
-      toast({
-        title: "Item updated",
-        description: "Your changes have been saved",
+        title: "Error",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Failed to save item. Please try again.",
+        variant: "destructive",
       });
     }
   };
