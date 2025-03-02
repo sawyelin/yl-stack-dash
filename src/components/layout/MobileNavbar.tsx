@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { getStorageType, toggleStorageType } from "@/lib/storage";
 import {
   Menu,
   Search,
@@ -16,6 +17,7 @@ import {
   Sun,
   Sparkles,
   X,
+  Database,
 } from "lucide-react";
 
 interface MobileNavbarProps {
@@ -192,6 +194,25 @@ const MobileSidebar = ({
   isDarkMode = false,
   onThemeToggle = () => {},
 }: MobileSidebarProps) => {
+  const [storageType, setStorageType] = useState(getStorageType());
+
+  // Update storage type display when it changes
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      const currentType = getStorageType();
+      if (currentType !== storageType) {
+        setStorageType(currentType);
+      }
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [storageType]);
+
+  const handleToggleStorage = () => {
+    toggleStorageType();
+    setStorageType(getStorageType());
+  };
+
   const recentTags = [
     { name: "personal", count: 4 },
     { name: "work", count: 7 },
@@ -272,7 +293,7 @@ const MobileSidebar = ({
         </div>
       </div>
 
-      <div className="p-4 border-t border-gray-200 dark:border-gray-800">
+      <div className="p-4 border-t border-gray-200 dark:border-gray-800 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <Settings className="h-4 w-4 mr-2 text-gray-500" />
@@ -289,6 +310,21 @@ const MobileSidebar = ({
             ) : (
               <Sun className="h-4 w-4 text-amber-400" />
             )}
+          </Button>
+        </div>
+
+        <div className="flex items-center justify-between bg-gray-100 dark:bg-gray-800 p-2 rounded-md">
+          <div className="flex items-center">
+            <Database className="h-4 w-4 mr-2 text-primary" />
+            <span className="text-sm">{storageType}</span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleToggleStorage}
+            className="h-7 text-xs border-primary/50 bg-primary/5 dark:bg-primary/10"
+          >
+            Toggle
           </Button>
         </div>
       </div>

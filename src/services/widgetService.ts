@@ -1,5 +1,10 @@
-import { queryD1, executeD1 } from "@/lib/cloudflare";
 import { Widget } from "@/components/dashboard/DashboardGrid";
+import {
+  queryStorage,
+  executeStorage,
+  formatWidget as formatStorageWidget,
+  initStorage,
+} from "@/lib/storage";
 
 export interface WidgetData
   extends Omit<Widget, "createdAt" | "updatedAt" | "customFields"> {
@@ -8,8 +13,11 @@ export interface WidgetData
   customFields?: string; // JSON string in DB
 }
 
+// Initialize storage when module is loaded
+initStorage();
+
 export async function getAllWidgets(): Promise<Widget[]> {
-  const response = await queryD1<WidgetData>(
+  const response = await queryStorage<WidgetData>(
     `SELECT * FROM widgets ORDER BY updatedAt DESC`,
   );
 
@@ -17,11 +25,11 @@ export async function getAllWidgets(): Promise<Widget[]> {
     throw new Error(response.error || "Failed to fetch widgets");
   }
 
-  return response.results.map(formatWidget);
+  return response.results.map(formatStorageWidget);
 }
 
 export async function getWidgetById(id: string): Promise<Widget | null> {
-  const response = await queryD1<WidgetData>(
+  const response = await queryStorage<WidgetData>(
     `SELECT * FROM widgets WHERE id = ?`,
     [id],
   );
@@ -30,7 +38,7 @@ export async function getWidgetById(id: string): Promise<Widget | null> {
     return null;
   }
 
-  return formatWidget(response.results[0]);
+  return formatStorageWidget(response.results[0]);
 }
 
 export async function createWidget(
@@ -39,7 +47,7 @@ export async function createWidget(
   const now = new Date().toISOString();
   const id = `widget-${Date.now()}`;
 
-  const response = await executeD1<{ id: string }>(
+  const response = await executeStorage<{ id: string }>(
     `INSERT INTO widgets (id, title, content, type, tags, url, isProtected, credentialType, customFields, createdAt, updatedAt) 
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      RETURNING id`,
@@ -73,7 +81,7 @@ export async function createWidget(
 export async function updateWidget(widget: Widget): Promise<Widget> {
   const now = new Date().toISOString();
 
-  const response = await executeD1(
+  const response = await executeStorage(
     `UPDATE widgets 
      SET title = ?, content = ?, type = ?, tags = ?, url = ?, isProtected = ?, 
      credentialType = ?, customFields = ?, updatedAt = ? 
@@ -103,7 +111,9 @@ export async function updateWidget(widget: Widget): Promise<Widget> {
 }
 
 export async function deleteWidget(id: string): Promise<boolean> {
-  const response = await executeD1(`DELETE FROM widgets WHERE id = ?`, [id]);
+  const response = await executeStorage(`DELETE FROM widgets WHERE id = ?`, [
+    id,
+  ]);
 
   return response.success;
 }
@@ -111,7 +121,7 @@ export async function deleteWidget(id: string): Promise<boolean> {
 export async function searchWidgets(query: string): Promise<Widget[]> {
   const searchTerm = `%${query}%`;
 
-  const response = await queryD1<WidgetData>(
+  const response = await queryStorage<WidgetData>(
     `SELECT * FROM widgets 
      WHERE title LIKE ? OR content LIKE ? 
      ORDER BY updatedAt DESC`,
@@ -122,11 +132,11 @@ export async function searchWidgets(query: string): Promise<Widget[]> {
     throw new Error(response.error || "Failed to search widgets");
   }
 
-  return response.results.map(formatWidget);
+  return response.results.map(formatStorageWidget);
 }
 
 export async function getWidgetsByType(type: string): Promise<Widget[]> {
-  const response = await queryD1<WidgetData>(
+  const response = await queryStorage<WidgetData>(
     `SELECT * FROM widgets WHERE type = ? ORDER BY updatedAt DESC`,
     [type],
   );
@@ -135,12 +145,12 @@ export async function getWidgetsByType(type: string): Promise<Widget[]> {
     throw new Error(response.error || "Failed to fetch widgets by type");
   }
 
-  return response.results.map(formatWidget);
+  return response.results.map(formatStorageWidget);
 }
 
 export async function getWidgetsByTag(tag: string): Promise<Widget[]> {
-  const response = await queryD1<WidgetData>(
-    `SELECT * FROM widgets WHERE json_extract(tags, '$') LIKE ? ORDER BY updatedAt DESC`,
+  const response = await queryStorage<WidgetData>(
+    `SELECT * FROM widgets WHERE json_extract(tags, ') LIKE ? ORDER BY updatedAt DESC`,
     [`%${tag}%`],
   );
 
@@ -148,21 +158,8 @@ export async function getWidgetsByTag(tag: string): Promise<Widget[]> {
     throw new Error(response.error || "Failed to fetch widgets by tag");
   }
 
-  return response.results.map(formatWidget);
+  return response.results.map(formatStorageWidget);
 }
 
-// Helper function to format widget data from DB
-function formatWidget(data: WidgetData): Widget {
-  return {
-    ...data,
-    tags: Array.isArray(data.tags)
-      ? data.tags
-      : typeof data.tags === "string"
-        ? JSON.parse(data.tags)
-        : [],
-    isProtected: Boolean(data.isProtected),
-    customFields: data.customFields ? JSON.parse(data.customFields) : undefined,
-    createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
-    updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date(),
-  };
-}
+// Re-export the formatWidget function for use elsewhere
+export { formatStorageWidget as formatWidget };

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { getStorageType, toggleStorageType } from "@/lib/storage";
 import {
   Search,
   Home,
@@ -23,6 +24,7 @@ import {
   Shield,
   Bookmark,
   Sparkles,
+  Database,
 } from "lucide-react";
 import {
   Collapsible,
@@ -49,6 +51,24 @@ const Sidebar = ({
 }: SidebarProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [storageType, setStorageType] = useState(getStorageType());
+
+  // Update storage type display when it changes
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      const currentType = getStorageType();
+      if (currentType !== storageType) {
+        setStorageType(currentType);
+      }
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [storageType]);
+
+  const handleToggleStorage = () => {
+    toggleStorageType();
+    setStorageType(getStorageType());
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -236,6 +256,21 @@ const Sidebar = ({
                 onCheckedChange={onThemeToggle}
                 className="data-[state=checked]:bg-indigo-500"
               />
+            </div>
+
+            <div className="flex items-center justify-between p-2 rounded-md bg-gray-100 dark:bg-gray-800">
+              <div className="flex items-center space-x-2">
+                <Database className="h-4 w-4 text-primary" />
+                <Label className="cursor-pointer">Storage: {storageType}</Label>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleToggleStorage}
+                className="h-7 text-xs border-primary/50 bg-primary/5 dark:bg-primary/10"
+              >
+                Toggle
+              </Button>
             </div>
 
             <div className="space-y-2">

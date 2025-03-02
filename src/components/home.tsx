@@ -6,6 +6,7 @@ import ItemModal from "./modals/ItemModal";
 import CredentialAccessModal from "./modals/CredentialAccessModal";
 import LoginForm from "./auth/LoginForm";
 import { useToast } from "@/components/ui/use-toast";
+import { getStorageType } from "@/lib/storage";
 
 const Home = () => {
   // Toast notifications
@@ -37,10 +38,24 @@ const Home = () => {
   const [currentCredentialId, setCurrentCredentialId] = useState("");
   const [currentCredentialTitle, setCurrentCredentialTitle] = useState("");
 
-  // Load data on component mount
+  // Storage type state
+  const [storageType, setStorageType] = useState(getStorageType());
+
+  // Load dashboard data on component mount or when storage type changes
   useEffect(() => {
     loadDashboardData();
-  }, []);
+
+    // Set up interval to check for storage type changes
+    const intervalId = setInterval(() => {
+      const currentType = getStorageType();
+      if (currentType !== storageType) {
+        setStorageType(currentType);
+        loadDashboardData(); // Reload data when storage type changes
+      }
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [storageType]);
 
   // Apply dark mode class to document
   useEffect(() => {
