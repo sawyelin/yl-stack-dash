@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -57,7 +57,28 @@ const ItemModal = ({
   onSave = () => {},
   onDelete = () => {},
 }: ItemModalProps) => {
-  const [formData, setFormData] = useState(item);
+  const [formData, setFormData] = useState({ ...item });
+
+  // Only set default content when adding a new item and the type changes
+  useEffect(() => {
+    if (mode === "add" && !formData.content) {
+      let defaultContent = "";
+      if (formData.type === "link") {
+        defaultContent = "A useful link to bookmark for future reference.";
+      } else if (formData.type === "note") {
+        defaultContent =
+          "Write your notes here. This can include important information, reminders, or any text you want to save.";
+      } else if (formData.type === "credential") {
+        defaultContent =
+          "Username: your_username\nPassword: your_password\nWebsite: example.com\nNotes: Add any additional information here.";
+      } else if (formData.type === "tagged") {
+        defaultContent =
+          "This is a tagged item that can be organized with multiple tags for easy filtering and searching.";
+      }
+      setFormData((prev) => ({ ...prev, content: defaultContent }));
+    }
+  }, [formData.type, mode]);
+
   const [newTag, setNewTag] = useState("");
 
   const handleInputChange = (
@@ -203,18 +224,40 @@ const ItemModal = ({
             defaultValue={formData.type}
             value={formData.type}
             className="w-full"
+            onValueChange={(value) => handleTypeChange(value as WidgetType)}
           >
             <TabsList className="grid grid-cols-4 mb-4">
-              <TabsTrigger value="link" disabled={mode === "add"}>
+              <TabsTrigger
+                value="link"
+                disabled={
+                  isViewMode || (mode === "edit" && formData.type !== "link")
+                }
+              >
                 Link
               </TabsTrigger>
-              <TabsTrigger value="note" disabled={mode === "add"}>
+              <TabsTrigger
+                value="note"
+                disabled={
+                  isViewMode || (mode === "edit" && formData.type !== "note")
+                }
+              >
                 Note
               </TabsTrigger>
-              <TabsTrigger value="credential" disabled={mode === "add"}>
+              <TabsTrigger
+                value="credential"
+                disabled={
+                  isViewMode ||
+                  (mode === "edit" && formData.type !== "credential")
+                }
+              >
                 Credential
               </TabsTrigger>
-              <TabsTrigger value="tagged" disabled={mode === "add"}>
+              <TabsTrigger
+                value="tagged"
+                disabled={
+                  isViewMode || (mode === "edit" && formData.type !== "tagged")
+                }
+              >
                 Tagged
               </TabsTrigger>
             </TabsList>

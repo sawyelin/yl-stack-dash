@@ -13,8 +13,15 @@ export interface WidgetData
   customFields?: string; // JSON string in DB
 }
 
-// Initialize storage when module is loaded
-initStorage();
+// Initialize storage and folders when module is loaded
+initStorage().then(async () => {
+  // Initialize folder structure
+  const { initFolders, addFolderColumnToWidgets } = await import(
+    "./folderService"
+  );
+  await initFolders();
+  await addFolderColumnToWidgets();
+});
 
 export async function getAllWidgets(): Promise<Widget[]> {
   const response = await queryStorage<WidgetData>(
@@ -70,6 +77,10 @@ export async function createWidget(
     throw new Error(response.error || "Failed to create widget");
   }
 
+  // Save database state after creating widget
+  const { saveDatabase } = await import("@/lib/sqlite");
+  saveDatabase();
+
   return {
     ...widget,
     id,
@@ -104,6 +115,10 @@ export async function updateWidget(widget: Widget): Promise<Widget> {
     throw new Error(response.error || "Failed to update widget");
   }
 
+  // Save database state after updating widget
+  const { saveDatabase } = await import("@/lib/sqlite");
+  saveDatabase();
+
   return {
     ...widget,
     updatedAt: new Date(now),
@@ -114,6 +129,12 @@ export async function deleteWidget(id: string): Promise<boolean> {
   const response = await executeStorage(`DELETE FROM widgets WHERE id = ?`, [
     id,
   ]);
+
+  if (response.success) {
+    // Save database state after deleting widget
+    const { saveDatabase } = await import("@/lib/sqlite");
+    saveDatabase();
+  }
 
   return response.success;
 }

@@ -9,6 +9,9 @@ const isBrowser = typeof window !== "undefined";
 let db: any = null;
 let initialized = false;
 
+// Use localStorage to persist database state
+const DB_STORAGE_KEY = "secure-vault-db";
+
 // Helper function to format widget data from DB
 export function formatWidget(data: WidgetData): Widget {
   return {
@@ -33,18 +36,31 @@ export async function initDatabase(): Promise<boolean> {
   try {
     // Dynamically import SQL.js
     const SQL = await import("sql.js");
-    const sqlPromise = SQL.default();
-    const dataPromise = fetch("/db/dashboard.sqlite")
-      .then((res) => {
-        // If the file doesn't exist yet, return an empty ArrayBuffer
-        if (!res.ok) return new ArrayBuffer(0);
-        return res.arrayBuffer();
-      })
-      .catch(() => new ArrayBuffer(0));
+    const sqlPromise = SQL.default({
+      locateFile: (file) => `/node_modules/sql.js/dist/${file}`,
+    });
+    // Try to load database from localStorage first
+    let initialData = new ArrayBuffer(0);
+    if (isBrowser && localStorage.getItem(DB_STORAGE_KEY)) {
+      try {
+        const storedData = localStorage.getItem(DB_STORAGE_KEY);
+        if (storedData) {
+          const binary = atob(storedData);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+          }
+          initialData = bytes.buffer;
+        }
+      } catch (e) {
+        console.error("Failed to load database from localStorage:", e);
+      }
+    }
+    const dataPromise = Promise.resolve(initialData);
 
     const [SQL_js, buf] = await Promise.all([sqlPromise, dataPromise]);
 
-    // Create a database
+    // Create database from stored data or create new if none exists
     db = new SQL_js.Database(
       buf.byteLength > 0 ? new Uint8Array(buf) : undefined,
     );
@@ -75,7 +91,16 @@ export async function initDatabase(): Promise<boolean> {
     `);
 
     // Insert sample data if the database is empty
-    const count = db.exec("SELECT COUNT(*) FROM widgets")[0].values[0][0];
+    // Check if the widgets table exists and has data
+    let count = 0;
+    try {
+      const result = db.exec("SELECT COUNT(*) FROM widgets");
+      if (result && result[0] && result[0].values && result[0].values[0]) {
+        count = result[0].values[0][0];
+      }
+    } catch (e) {
+      // Table doesn't exist yet, count remains 0
+    }
     if (count === 0) {
       insertSampleData();
     }
@@ -88,10 +113,20 @@ export async function initDatabase(): Promise<boolean> {
   }
 }
 
-// Save the database to a file
+// Save the database to localStorage
 export function saveDatabase(): Uint8Array | null {
-  if (!db) return null;
-  return db.export();
+  if (!db || !isBrowser) return null;
+
+  try {
+    const data = db.export();
+    const binary = String.fromCharCode.apply(null, data);
+    const base64 = btoa(binary);
+    localStorage.setItem(DB_STORAGE_KEY, base64);
+    return data;
+  } catch (e) {
+    console.error("Failed to save database to localStorage:", e);
+    return null;
+  }
 }
 
 // Insert sample data

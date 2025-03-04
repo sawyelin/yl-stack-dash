@@ -238,7 +238,8 @@ const Home = () => {
   const handleEditItem = (id: string) => {
     const item = widgets.find((widget) => widget.id === id);
     if (item) {
-      setCurrentItem(item);
+      // Make sure to preserve the original type when editing
+      setCurrentItem({ ...item });
       setItemModalMode("edit");
       setItemModalOpen(true);
     }
