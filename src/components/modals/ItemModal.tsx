@@ -19,45 +19,89 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Link, FileText, Key, Tag, Plus, X } from "lucide-react";
+import { Link, FileText, Key, Tag, Plus, X, Lock, ExternalLink, FolderIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Folder } from "@/services/folderService";
 
 type WidgetType = "link" | "note" | "credential" | "tagged";
+
+interface Widget {
+  id: string;
+  title: string;
+  content: string;
+  type: WidgetType;
+  tags: string[];
+  url?: string;
+  isProtected?: boolean;
+  folder_id?: string | null;
+}
 
 interface ItemModalProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   mode?: "add" | "edit" | "view";
-  item?: {
-    id: string;
-    title: string;
-    content: string;
-    type: WidgetType;
-    tags: string[];
-    url?: string;
-    isProtected?: boolean;
-  };
-  onSave?: (item: any) => void;
-  onDelete?: (id: string) => void;
+  activeType?: WidgetType;
+  item?: Widget;
+  folders?: Folder[];
+  folder_id?: string | null;
+  defaultFolderId?: string | null;
+  onSave?: (item: Widget) => void;
+  onDelete?: (widget: Widget) => void;
 }
 
 const ItemModal = ({
-  open = true,
+  open = false,
   onOpenChange = () => {},
   mode = "add",
-  item = {
-    id: "",
-    title: "",
-    content: "",
-    type: "note" as WidgetType,
-    tags: [],
-    url: "",
-    isProtected: false,
-  },
+  activeType = "note",
+  item,
+  folders = [],
+  folder_id = null,
+  defaultFolderId = null,
   onSave = () => {},
   onDelete = () => {},
 }: ItemModalProps) => {
-  const [formData, setFormData] = useState({ ...item });
+  const [formData, setFormData] = useState<Widget>({
+    id: item?.id || "",
+    title: item?.title || "",
+    content: item?.content || "",
+    type: item?.type || activeType,
+    tags: item?.tags || [],
+    url: item?.url || "",
+    isProtected: item?.isProtected || false,
+    folder_id: item?.folder_id || folder_id || defaultFolderId,
+  });
+  const [newTag, setNewTag] = useState("");
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [pin, setPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [pinError, setPinError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (mode === "add") {
+      setFormData({
+        id: "",
+        title: "",
+        content: "",
+        type: activeType,
+        tags: [],
+        url: "",
+        isProtected: false,
+        folder_id: folder_id || defaultFolderId,
+      });
+    } else if (item) {
+      setFormData({
+        id: item.id,
+        title: item.title,
+        content: item.content,
+        type: item.type,
+        tags: item.tags || [],
+        url: item.url || "",
+        isProtected: item.isProtected || false,
+        folder_id: item.folder_id || folder_id || defaultFolderId,
+      });
+    }
+  }, [mode, item, activeType, folder_id, defaultFolderId]);
 
   // Only set default content when adding a new item and the type changes
   useEffect(() => {
@@ -79,8 +123,6 @@ const ItemModal = ({
     }
   }, [formData.type, mode]);
 
-  const [newTag, setNewTag] = useState("");
-
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
@@ -93,7 +135,36 @@ const ItemModal = ({
   };
 
   const handleProtectedChange = (checked: boolean) => {
-    setFormData((prev) => ({ ...prev, isProtected: checked }));
+    if (checked) {
+      setShowPinModal(true);
+    } else {
+      setFormData(prev => ({ ...prev, isProtected: false }));
+      // Remove PIN when disabling protection
+      if (formData.id) {
+        localStorage.removeItem(`credential_pin_${formData.id}`);
+      }
+    }
+  };
+
+  const handlePinSubmit = () => {
+    if (pin.length !== 4) {
+      setPinError("PIN must be 4 digits");
+      return;
+    }
+    if (pin !== confirmPin) {
+      setPinError("PINs do not match");
+      return;
+    }
+
+    // Store the PIN and update form data
+    if (formData.id) {
+      localStorage.setItem(`credential_pin_${formData.id}`, pin);
+    }
+    setFormData(prev => ({ ...prev, isProtected: true }));
+    setShowPinModal(false);
+    setPin("");
+    setConfirmPin("");
+    setPinError(null);
   };
 
   const handleAddTag = () => {
@@ -117,15 +188,17 @@ const ItemModal = ({
     e.preventDefault();
     onSave(formData);
     if (mode === "add") {
-      // Reset form after adding
+      // Reset form after adding but keep the current folder_id
+      const currentFolderId = formData.folder_id;
       setFormData({
         id: "",
         title: "",
         content: "",
-        type: "note",
+        type: activeType,
         tags: [],
         url: "",
         isProtected: false,
+        folder_id: currentFolderId, // Keep the current folder_id
       });
     }
     onOpenChange(false);
@@ -160,6 +233,7 @@ const ItemModal = ({
   };
 
   const isViewMode = mode === "view";
+  const isEditMode = mode === "edit";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -178,166 +252,144 @@ const ItemModal = ({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit}>
-          {mode === "add" && (
-            <div className="mb-6">
-              <Label htmlFor="type">Item Type</Label>
-              <Select
-                value={formData.type}
-                onValueChange={(value) => handleTypeChange(value as WidgetType)}
-                disabled={isViewMode}
-              >
-                <SelectTrigger className="w-full mt-1">
-                  <SelectValue placeholder="Select item type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="link">
-                    <div className="flex items-center gap-2">
-                      <Link className="h-4 w-4 text-blue-500" />
-                      <span>Link</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="note">
-                    <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-green-500" />
-                      <span>Note</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="credential">
-                    <div className="flex items-center gap-2">
-                      <Key className="h-4 w-4 text-amber-500" />
-                      <span>Credential</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="tagged">
-                    <div className="flex items-center gap-2">
-                      <Tag className="h-4 w-4 text-purple-500" />
-                      <span>Tagged Item</span>
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <Tabs
-            defaultValue={formData.type}
-            value={formData.type}
-            className="w-full"
-            onValueChange={(value) => handleTypeChange(value as WidgetType)}
-          >
-            <TabsList className="grid grid-cols-4 mb-4">
-              <TabsTrigger
-                value="link"
-                disabled={
-                  isViewMode || (mode === "edit" && formData.type !== "link")
-                }
-              >
-                Link
-              </TabsTrigger>
-              <TabsTrigger
-                value="note"
-                disabled={
-                  isViewMode || (mode === "edit" && formData.type !== "note")
-                }
-              >
-                Note
-              </TabsTrigger>
-              <TabsTrigger
-                value="credential"
-                disabled={
-                  isViewMode ||
-                  (mode === "edit" && formData.type !== "credential")
-                }
-              >
-                Credential
-              </TabsTrigger>
-              <TabsTrigger
-                value="tagged"
-                disabled={
-                  isViewMode || (mode === "edit" && formData.type !== "tagged")
-                }
-              >
-                Tagged
-              </TabsTrigger>
-            </TabsList>
-
-            {/* Common fields for all types */}
-            <div className="space-y-4 mb-4">
-              <div>
-                <Label htmlFor="title">Title</Label>
-                <Input
-                  id="title"
-                  name="title"
-                  value={formData.title}
-                  onChange={handleInputChange}
-                  placeholder="Enter title"
-                  className="mt-1"
-                  disabled={isViewMode}
-                  required
-                />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Common fields for all types */}
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="title" className="flex items-center gap-2">
+                Title
+                {isViewMode && formData.isProtected && (
+                  <Lock className="h-4 w-4 text-amber-500" />
+                )}
+              </Label>
+              <div className={cn(
+                "mt-1",
+                isViewMode && "p-2 rounded-md bg-gray-50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-700/50"
+              )}>
+                {isViewMode ? formData.title : (
+                  <Input
+                    id="title"
+                    name="title"
+                    value={formData.title}
+                    onChange={handleInputChange}
+                    placeholder="Enter title"
+                    disabled={isViewMode}
+                    required
+                  />
+                )}
               </div>
+            </div>
 
-              {/* Type-specific content fields */}
-              <TabsContent value="link" className="mt-0">
+            {/* Type-specific content fields */}
+            {formData.type === "link" && (
+              <div className="space-y-4">
                 <div>
                   <Label htmlFor="url">URL</Label>
-                  <Input
-                    id="url"
-                    name="url"
-                    value={formData.url}
-                    onChange={handleInputChange}
-                    placeholder="https://example.com"
-                    className="mt-1"
-                    disabled={isViewMode}
-                    required={formData.type === "link"}
-                  />
+                  <div className={cn(
+                    "mt-1",
+                    isViewMode && "p-2 rounded-md bg-gray-50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-700/50 flex items-center justify-between"
+                  )}>
+                    {isViewMode ? (
+                      <>
+                        <span className="text-blue-500">{formData.url}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.open(formData.url, "_blank")}
+                          className="ml-2"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <Input
+                        id="url"
+                        name="url"
+                        value={formData.url}
+                        onChange={handleInputChange}
+                        placeholder="https://example.com"
+                        disabled={isViewMode}
+                        required
+                      />
+                    )}
+                  </div>
                 </div>
-                <div className="mt-4">
-                  <Label htmlFor="content">Description</Label>
-                  <Textarea
-                    id="content"
-                    name="content"
-                    value={formData.content}
-                    onChange={handleInputChange}
-                    placeholder="Enter a description"
-                    className="mt-1"
-                    disabled={isViewMode}
-                  />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="note" className="mt-0">
                 <div>
-                  <Label htmlFor="content">Note Content</Label>
-                  <Textarea
-                    id="content"
-                    name="content"
-                    value={formData.content}
-                    onChange={handleInputChange}
-                    placeholder="Enter your note"
-                    className="mt-1 min-h-[150px]"
-                    disabled={isViewMode}
-                    required={formData.type === "note"}
-                  />
+                  <Label htmlFor="content">Description</Label>
+                  <div className={cn(
+                    "mt-1",
+                    isViewMode && "p-2 rounded-md bg-gray-50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-700/50"
+                  )}>
+                    {isViewMode ? formData.content : (
+                      <Textarea
+                        id="content"
+                        name="content"
+                        value={formData.content}
+                        onChange={handleInputChange}
+                        placeholder="Enter a description"
+                        disabled={isViewMode}
+                      />
+                    )}
+                  </div>
                 </div>
-              </TabsContent>
+              </div>
+            )}
 
-              <TabsContent value="credential" className="mt-0">
+            {formData.type === "note" && (
+              <div>
+                <Label htmlFor="content">Note Content</Label>
+                <div className={cn(
+                  "mt-1",
+                  isViewMode && "p-2 rounded-md bg-gray-50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-700/50 whitespace-pre-wrap"
+                )}>
+                  {isViewMode ? formData.content : (
+                    <Textarea
+                      id="content"
+                      name="content"
+                      value={formData.content}
+                      onChange={handleInputChange}
+                      placeholder="Enter your note"
+                      className="min-h-[150px]"
+                      disabled={isViewMode}
+                      required
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+
+            {formData.type === "credential" && (
+              <div className="space-y-4">
                 <div>
                   <Label htmlFor="content">Credential</Label>
-                  <Textarea
-                    id="content"
-                    name="content"
-                    value={formData.content}
-                    onChange={handleInputChange}
-                    placeholder="Enter credential information"
-                    className="mt-1"
-                    disabled={isViewMode}
-                    required={formData.type === "credential"}
-                  />
+                  <div className={cn(
+                    "mt-1",
+                    isViewMode && "p-2 rounded-md bg-gray-50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-700/50"
+                  )}>
+                    {isViewMode && formData.isProtected ? (
+                      <div className="flex items-center text-amber-600 dark:text-amber-400">
+                        <Lock className="h-4 w-4 mr-2" />
+                        Protected content
+                      </div>
+                    ) : (
+                      isViewMode ? (
+                        <div className="whitespace-pre-wrap">{formData.content}</div>
+                      ) : (
+                        <Textarea
+                          id="content"
+                          name="content"
+                          value={formData.content}
+                          onChange={handleInputChange}
+                          placeholder="Enter credential information"
+                          disabled={isViewMode}
+                          required
+                        />
+                      )
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2 mt-4">
+                <div className="flex items-center space-x-2">
                   <Switch
                     id="isProtected"
                     checked={formData.isProtected}
@@ -346,87 +398,122 @@ const ItemModal = ({
                   />
                   <Label htmlFor="isProtected">Password Protected</Label>
                 </div>
-              </TabsContent>
+              </div>
+            )}
 
-              <TabsContent value="tagged" className="mt-0">
-                <div>
-                  <Label htmlFor="content">Content</Label>
-                  <Textarea
-                    id="content"
-                    name="content"
-                    value={formData.content}
-                    onChange={handleInputChange}
-                    placeholder="Enter content"
-                    className="mt-1"
-                    disabled={isViewMode}
-                    required={formData.type === "tagged"}
-                  />
-                </div>
-              </TabsContent>
-
-              {/* Tags section for all types */}
+            {formData.type === "tagged" && (
               <div>
-                <Label>Tags</Label>
-                <div className="flex mt-1">
-                  <Input
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    placeholder="Add a tag"
-                    className="rounded-r-none"
-                    disabled={isViewMode}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleAddTag();
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    onClick={handleAddTag}
-                    className="rounded-l-none"
-                    disabled={isViewMode}
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {formData.tags.map((tag, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded-full text-sm"
-                    >
-                      <span>{tag}</span>
-                      {!isViewMode && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-5 w-5 p-0 ml-1"
-                          onClick={() => handleRemoveTag(tag)}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
+                <Label htmlFor="content">Content</Label>
+                <div className={cn(
+                  "mt-1",
+                  isViewMode && "p-2 rounded-md bg-gray-50 dark:bg-gray-800/50 border border-gray-200/50 dark:border-gray-700/50 whitespace-pre-wrap"
+                )}>
+                  {isViewMode ? formData.content : (
+                    <Textarea
+                      id="content"
+                      name="content"
+                      value={formData.content}
+                      onChange={handleInputChange}
+                      placeholder="Enter content"
+                      disabled={isViewMode}
+                      required
+                    />
+                  )}
                 </div>
               </div>
-            </div>
-          </Tabs>
+            )}
 
-          <DialogFooter className="mt-6">
-            {mode === "view" ? (
+            {/* Tags section */}
+            <div>
+              <Label className="mb-2 block">Tags</Label>
+              <div className="flex flex-wrap gap-2">
+                {formData.tags.map((tag, index) => (
+                  <div
+                    key={index}
+                    className={cn(
+                      "px-2 py-1 rounded-full text-sm flex items-center gap-1",
+                      isViewMode ? "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300" :
+                      "bg-primary/10 text-primary dark:bg-primary/20"
+                    )}
+                  >
+                    {tag}
+                    {!isViewMode && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-4 w-4 p-0 hover:bg-primary/20"
+                        onClick={() => handleRemoveTag(tag)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                {!isViewMode && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="text"
+                      value={newTag}
+                      onChange={(e) => setNewTag(e.target.value)}
+                      placeholder="Add tag"
+                      className="h-8 text-sm"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={handleAddTag}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Folder selection */}
+            {!isViewMode && folders.length > 0 && (
+              <div>
+                <Label htmlFor="folder">Folder (Optional)</Label>
+                <Select
+                  value={formData.folder_id || "root"}
+                  onValueChange={(value) => setFormData(prev => ({ 
+                    ...prev, 
+                    folder_id: value === "root" ? null : value 
+                  }))}
+                >
+                  <SelectTrigger className="w-full mt-1">
+                    <SelectValue placeholder="Select a folder" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="root">
+                      <span>No Folder</span>
+                    </SelectItem>
+                    {folders.map((folder) => (
+                      <SelectItem key={folder.id} value={folder.id}>
+                        <div className="flex items-center gap-2">
+                          <FolderIcon className="h-4 w-4" />
+                          <span>{folder.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <DialogFooter>
+            {isViewMode ? (
               <Button type="button" onClick={() => onOpenChange(false)}>
                 Close
               </Button>
             ) : (
               <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                >
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                   Cancel
                 </Button>
                 <Button type="submit">
@@ -434,20 +521,75 @@ const ItemModal = ({
                 </Button>
               </>
             )}
-            {(mode === "edit" || mode === "view") && (
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={() => {
-                  onDelete(formData.id);
-                  onOpenChange(false);
-                }}
-              >
-                Delete
-              </Button>
-            )}
           </DialogFooter>
         </form>
+
+        {showPinModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-[90vw] max-w-md space-y-4">
+              <h3 className="text-lg font-semibold">Set PIN Code</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Enter a 4-digit PIN to protect this credential
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <Input
+                    type="password"
+                    placeholder="Enter 4-digit PIN"
+                    value={pin}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, "").slice(0, 4);
+                      setPin(value);
+                      setPinError(null);
+                    }}
+                    className="text-center text-2xl tracking-widest"
+                    pattern="[0-9]*"
+                    inputMode="numeric"
+                    maxLength={4}
+                  />
+                </div>
+                <div>
+                  <Input
+                    type="password"
+                    placeholder="Confirm 4-digit PIN"
+                    value={confirmPin}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, "").slice(0, 4);
+                      setConfirmPin(value);
+                      setPinError(null);
+                    }}
+                    className="text-center text-2xl tracking-widest"
+                    pattern="[0-9]*"
+                    inputMode="numeric"
+                    maxLength={4}
+                  />
+                </div>
+                {pinError && (
+                  <div className="text-sm text-red-500">{pinError}</div>
+                )}
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowPinModal(false);
+                      setPin("");
+                      setConfirmPin("");
+                      setPinError(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handlePinSubmit}
+                    disabled={pin.length !== 4 || confirmPin.length !== 4}
+                  >
+                    Set PIN
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

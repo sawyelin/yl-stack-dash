@@ -1,5 +1,16 @@
 -- Cloudflare D1 Schema for Dashboard Management System
 
+-- Folders table
+CREATE TABLE IF NOT EXISTS folders (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('link', 'note', 'credential', 'tagged', 'all')),
+  parent_id TEXT,
+  createdAt TEXT NOT NULL,
+  updatedAt TEXT NOT NULL,
+  FOREIGN KEY (parent_id) REFERENCES folders(id) ON DELETE CASCADE
+);
+
 -- Widgets table
 CREATE TABLE IF NOT EXISTS widgets (
   id TEXT PRIMARY KEY,
@@ -11,13 +22,17 @@ CREATE TABLE IF NOT EXISTS widgets (
   isProtected INTEGER DEFAULT 0,
   credentialType TEXT, -- New field for credential type
   customFields TEXT, -- New field for custom fields (JSON)
+  folder_id TEXT, -- New field for folder organization
   createdAt TEXT NOT NULL,
-  updatedAt TEXT NOT NULL
+  updatedAt TEXT NOT NULL,
+  FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE SET NULL
 );
 
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_widgets_type ON widgets(type);
 CREATE INDEX IF NOT EXISTS idx_widgets_updated ON widgets(updatedAt);
+CREATE INDEX IF NOT EXISTS idx_widgets_folder ON widgets(folder_id);
+CREATE INDEX IF NOT EXISTS idx_folders_parent ON folders(parent_id);
 
 -- Vault Keys table for master passwords
 CREATE TABLE IF NOT EXISTS vault_keys (

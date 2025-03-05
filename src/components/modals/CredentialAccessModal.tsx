@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import {
   Shield,
   Copy,
   Lock,
+  KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,10 +27,8 @@ interface CredentialAccessModalProps {
   onClose?: () => void;
   credentialId?: string;
   credentialTitle?: string;
-  onPasswordSubmit?: (
-    password: string,
-    credentialId: string,
-  ) => Promise<boolean>;
+  onPasswordSubmit?: (pin: string, credentialId: string) => Promise<boolean>;
+  credentialContent?: string;
 }
 
 const CredentialAccessModal = ({
@@ -38,29 +37,74 @@ const CredentialAccessModal = ({
   credentialId = "credential-1",
   credentialTitle = "Protected Credential",
   onPasswordSubmit = async () => true,
+  credentialContent = "",
 }: CredentialAccessModalProps) => {
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [pin, setPin] = useState("");
+  const [showPin, setShowPin] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [decryptedContent, setDecryptedContent] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [isSettingPin, setIsSettingPin] = useState(false);
+  const [confirmPin, setConfirmPin] = useState("");
 
-  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPassword(e.target.value);
+  useEffect(() => {
+    // Check if a PIN is already set for this credential
+    const storedPin = localStorage.getItem(`credential_pin_${credentialId}`);
+    setIsSettingPin(!storedPin);
+  }, [credentialId]);
+
+  const handlePinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/[^0-9]/g, "").slice(0, 4);
+    if (isSettingPin) {
+      setPin(value);
+    } else {
+      setPin(value);
+    }
     if (error) setError(null);
   };
 
-  const toggleShowPassword = () => {
-    setShowPassword(!showPassword);
+  const handleConfirmPinChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/[^0-9]/g, "").slice(0, 4);
+    setConfirmPin(value);
+    if (error) setError(null);
+  };
+
+  const toggleShowPin = () => {
+    setShowPin(!showPin);
+  };
+
+  const handleSetPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pin.length !== 4) {
+      setError("PIN must be 4 digits");
+      return;
+    }
+    if (pin !== confirmPin) {
+      setError("PINs do not match");
+      return;
+    }
+
+    // Store the PIN for this credential
+    localStorage.setItem(`credential_pin_${credentialId}`, pin);
+    setIsSettingPin(false);
+    setPin("");
+    setConfirmPin("");
+    setError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!password.trim()) {
-      setError("Password is required");
+    if (pin.length !== 4) {
+      setError("PIN must be 4 digits");
+      return;
+    }
+
+    const storedPin = localStorage.getItem(`credential_pin_${credentialId}`);
+    if (pin !== storedPin) {
+      setError("Incorrect PIN");
       return;
     }
 
@@ -68,26 +112,13 @@ const CredentialAccessModal = ({
     setError(null);
 
     try {
-      const success = await onPasswordSubmit(password, credentialId);
+      const success = await onPasswordSubmit(pin, credentialId);
 
       if (success) {
         setIsSuccess(true);
-        // Example of structured credential data
-        setDecryptedContent(
-          JSON.stringify(
-            {
-              username: "admin@example.com",
-              password: "secureP@ssw0rd123",
-              url: "https://dashboard.example.com",
-              notes:
-                "Admin credentials for the main dashboard. Last updated on June 15, 2023.",
-            },
-            null,
-            2,
-          ),
-        );
+        setDecryptedContent(credentialContent);
       } else {
-        setError("Incorrect password. Please try again.");
+        setError("Failed to decrypt credential. Please try again.");
       }
     } catch (err) {
       setError("An error occurred. Please try again.");
@@ -105,9 +136,9 @@ const CredentialAccessModal = ({
   };
 
   const handleClose = () => {
-    // Reset state when closing
-    setPassword("");
-    setShowPassword(false);
+    setPin("");
+    setConfirmPin("");
+    setShowPin(false);
     setError(null);
     setIsSuccess(false);
     setDecryptedContent(null);
@@ -121,32 +152,36 @@ const CredentialAccessModal = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
             <div className="p-2 rounded-full bg-amber-100 dark:bg-amber-900/50">
-              <Key className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <KeyRound className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             </div>
-            <span>{credentialTitle}</span>
+            <span>{isSettingPin ? "Set PIN Code" : credentialTitle}</span>
           </DialogTitle>
           <DialogDescription className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-amber-500" />
             <span>
-              This credential is password protected. Enter the vault key to view
-              the content.
+              {isSettingPin
+                ? "Set a 4-digit PIN code to protect this credential"
+                : "Enter your 4-digit PIN code to view the content"}
             </span>
           </DialogDescription>
         </DialogHeader>
 
         {!isSuccess ? (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={isSettingPin ? handleSetPin : handleSubmit} className="space-y-4">
             <div className="grid gap-4 py-4">
               <div className="relative">
                 <div className="absolute left-3 top-2.5 text-amber-500">
                   <Lock className="h-5 w-5" />
                 </div>
                 <Input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter vault key"
-                  value={password}
-                  onChange={handlePasswordChange}
-                  className="pl-10 pr-10 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700 focus-visible:ring-amber-500"
+                  type={showPin ? "text" : "password"}
+                  placeholder="Enter 4-digit PIN"
+                  value={pin}
+                  onChange={handlePinChange}
+                  className="pl-10 pr-10 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700 focus-visible:ring-amber-500 text-center text-2xl tracking-widest"
+                  pattern="[0-9]*"
+                  inputMode="numeric"
+                  maxLength={4}
                   autoFocus
                   disabled={isSubmitting}
                 />
@@ -155,19 +190,38 @@ const CredentialAccessModal = ({
                   variant="ghost"
                   size="icon"
                   className="absolute right-0 top-0 h-10 w-10 text-amber-600"
-                  onClick={toggleShowPassword}
+                  onClick={toggleShowPin}
                   disabled={isSubmitting}
                 >
-                  {showPassword ? (
+                  {showPin ? (
                     <EyeOff className="h-4 w-4" />
                   ) : (
                     <Eye className="h-4 w-4" />
                   )}
                   <span className="sr-only">
-                    {showPassword ? "Hide password" : "Show password"}
+                    {showPin ? "Hide PIN" : "Show PIN"}
                   </span>
                 </Button>
               </div>
+
+              {isSettingPin && (
+                <div className="relative">
+                  <div className="absolute left-3 top-2.5 text-amber-500">
+                    <Lock className="h-5 w-5" />
+                  </div>
+                  <Input
+                    type={showPin ? "text" : "password"}
+                    placeholder="Confirm 4-digit PIN"
+                    value={confirmPin}
+                    onChange={handleConfirmPinChange}
+                    className="pl-10 pr-10 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700 focus-visible:ring-amber-500 text-center text-2xl tracking-widest"
+                    pattern="[0-9]*"
+                    inputMode="numeric"
+                    maxLength={4}
+                    disabled={isSubmitting}
+                  />
+                </div>
+              )}
 
               {error && (
                 <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-2 rounded">
@@ -180,7 +234,7 @@ const CredentialAccessModal = ({
             <DialogFooter>
               <Button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || (isSettingPin ? pin.length !== 4 || confirmPin.length !== 4 : pin.length !== 4)}
                 className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white"
               >
                 {isSubmitting ? (
@@ -205,7 +259,12 @@ const CredentialAccessModal = ({
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       ></path>
                     </svg>
-                    Decrypting...
+                    Verifying...
+                  </>
+                ) : isSettingPin ? (
+                  <>
+                    <Key className="mr-2 h-4 w-4" />
+                    Set PIN Code
                   </>
                 ) : (
                   <>

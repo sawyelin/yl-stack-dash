@@ -55,8 +55,8 @@ export async function createWidget(
   const id = `widget-${Date.now()}`;
 
   const response = await executeStorage<{ id: string }>(
-    `INSERT INTO widgets (id, title, content, type, tags, url, isProtected, credentialType, customFields, createdAt, updatedAt) 
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO widgets (id, title, content, type, tags, url, isProtected, credentialType, customFields, folder_id, createdAt, updatedAt) 
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      RETURNING id`,
     [
       id,
@@ -68,6 +68,7 @@ export async function createWidget(
       widget.isProtected ? 1 : 0,
       widget.credentialType || null,
       widget.customFields ? JSON.stringify(widget.customFields) : null,
+      widget.folder_id || null,
       now,
       now,
     ],
@@ -95,7 +96,7 @@ export async function updateWidget(widget: Widget): Promise<Widget> {
   const response = await executeStorage(
     `UPDATE widgets 
      SET title = ?, content = ?, type = ?, tags = ?, url = ?, isProtected = ?, 
-     credentialType = ?, customFields = ?, updatedAt = ? 
+     credentialType = ?, customFields = ?, folder_id = ?, updatedAt = ? 
      WHERE id = ?`,
     [
       widget.title,
@@ -106,6 +107,7 @@ export async function updateWidget(widget: Widget): Promise<Widget> {
       widget.isProtected ? 1 : 0,
       widget.credentialType || null,
       widget.customFields ? JSON.stringify(widget.customFields) : null,
+      widget.folder_id || null,
       now,
       widget.id,
     ],
@@ -180,6 +182,37 @@ export async function getWidgetsByTag(tag: string): Promise<Widget[]> {
   }
 
   return response.results.map(formatStorageWidget);
+}
+
+export async function getTagCounts(): Promise<Array<{ name: string; count: number }>> {
+  const response = await queryStorage<WidgetData>(
+    `SELECT * FROM widgets ORDER BY updatedAt DESC`
+  );
+
+  if (!response.success || !response.results) {
+    throw new Error(response.error || "Failed to fetch widgets for tag counts");
+  }
+
+  // Create a map to store tag counts
+  const tagCountMap = new Map<string, number>();
+
+  // Count occurrences of each tag
+  response.results.forEach(widget => {
+    const tags = Array.isArray(widget.tags)
+      ? widget.tags
+      : typeof widget.tags === 'string'
+      ? JSON.parse(widget.tags)
+      : [];
+    
+    tags.forEach(tag => {
+      tagCountMap.set(tag, (tagCountMap.get(tag) || 0) + 1);
+    });
+  });
+
+  // Convert map to array and sort by count (descending)
+  return Array.from(tagCountMap.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
 }
 
 // Re-export the formatWidget function for use elsewhere

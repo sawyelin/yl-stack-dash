@@ -25,12 +25,15 @@ import {
   Bookmark,
   Sparkles,
   Database,
+  FolderPlus,
+  Edit,
 } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Folder } from "@/services/folderService";
 
 interface SidebarProps {
   activeFilter?: string;
@@ -39,6 +42,7 @@ interface SidebarProps {
   isDarkMode?: boolean;
   onThemeToggle?: () => void;
   onColorThemeChange?: (theme: string) => void;
+  recentTags?: Array<{ name: string; count: number }>;
 }
 
 const Sidebar = ({
@@ -48,6 +52,7 @@ const Sidebar = ({
   isDarkMode = false,
   onThemeToggle = () => {},
   onColorThemeChange = () => {},
+  recentTags = [],
 }: SidebarProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -83,46 +88,41 @@ const Sidebar = ({
     { name: "Sunset", value: "orange", color: "bg-orange-500" },
   ];
 
-  const recentTags = [
-    { name: "personal", count: 4 },
-    { name: "work", count: 7 },
-    { name: "important", count: 3 },
-    { name: "archive", count: 2 },
-    { name: "finance", count: 5 },
-  ];
-
   return (
-    <div className="w-[280px] h-full bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 border-r border-gray-200 dark:border-gray-800 flex flex-col">
-      <div className="p-4 bg-gradient-to-r from-primary/10 to-accent/10 dark:from-primary/20 dark:to-accent/20">
-        <h1 className="text-xl font-bold mb-4 flex items-center bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-          <div className="p-2 rounded-md bg-white dark:bg-gray-800 shadow-sm mr-2">
-            <Sparkles className="h-5 w-5 text-primary" />
+    <div className="w-[280px] h-full bg-gradient-to-b from-gray-50/50 via-white to-gray-50/50 dark:from-gray-900 dark:via-gray-900/50 dark:to-gray-900 border-r border-gray-200/50 dark:border-gray-800/50 backdrop-blur-sm flex flex-col">
+      <div className="p-4 bg-gradient-to-br from-primary/5 via-primary/2 to-transparent dark:from-primary/10 dark:via-primary/5 dark:to-transparent">
+        <h1 className="text-xl font-bold mb-4 flex items-center">
+          <div className="p-2 rounded-lg bg-white/80 dark:bg-gray-800/80 shadow-sm mr-2 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50">
+            <Sparkles className="h-5 w-5 text-primary animate-pulse" />
           </div>
-          SecureVault
+          <span className="bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+            SecureVault
+          </span>
         </h1>
 
-        <form onSubmit={handleSearch} className="mb-4">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500 dark:text-gray-400" />
-            <Input
-              type="search"
-              placeholder="Search..."
-              className="pl-9 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm focus-visible:ring-primary/50"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
+        <form onSubmit={handleSearch} className="relative group">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500 dark:text-gray-400 transition-colors group-focus-within:text-primary" />
+          <Input
+            type="search"
+            placeholder="Search..."
+            className="pl-9 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-gray-200/50 dark:border-gray-700/50 transition-all duration-200 
+              focus-visible:bg-white dark:focus-visible:bg-gray-800 focus-visible:ring-primary/20 dark:focus-visible:ring-primary/20 
+              hover:bg-white/90 dark:hover:bg-gray-800/90"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </form>
       </div>
 
       <ScrollArea className="flex-grow px-4">
-        <div className="space-y-1 py-2">
+        <div className="space-y-1.5 py-4">
           <Button
             variant={activeFilter === "all" ? "default" : "ghost"}
             className={cn(
-              "w-full justify-start",
-              activeFilter === "all" &&
-                "bg-gradient-to-r from-primary to-primary/80",
+              "w-full justify-start transition-all duration-200",
+              activeFilter === "all"
+                ? "bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-sm"
+                : "hover:bg-gray-100 dark:hover:bg-gray-800 hover:shadow-sm"
             )}
             onClick={() => onFilterChange("all")}
           >
@@ -133,9 +133,10 @@ const Sidebar = ({
           <Button
             variant={activeFilter === "links" ? "default" : "ghost"}
             className={cn(
-              "w-full justify-start",
-              activeFilter === "links" &&
-                "bg-gradient-to-r from-blue-500 to-blue-600",
+              "w-full justify-start transition-all duration-200",
+              activeFilter === "links"
+                ? "bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-sm"
+                : "hover:bg-gray-100 dark:hover:bg-gray-800 hover:shadow-sm text-blue-600 dark:text-blue-400"
             )}
             onClick={() => onFilterChange("links")}
           >
@@ -146,9 +147,10 @@ const Sidebar = ({
           <Button
             variant={activeFilter === "notes" ? "default" : "ghost"}
             className={cn(
-              "w-full justify-start",
-              activeFilter === "notes" &&
-                "bg-gradient-to-r from-green-500 to-green-600",
+              "w-full justify-start transition-all duration-200",
+              activeFilter === "notes"
+                ? "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-sm"
+                : "hover:bg-gray-100 dark:hover:bg-gray-800 hover:shadow-sm text-emerald-600 dark:text-emerald-400"
             )}
             onClick={() => onFilterChange("notes")}
           >
@@ -159,9 +161,10 @@ const Sidebar = ({
           <Button
             variant={activeFilter === "credentials" ? "default" : "ghost"}
             className={cn(
-              "w-full justify-start",
-              activeFilter === "credentials" &&
-                "bg-gradient-to-r from-amber-500 to-amber-600",
+              "w-full justify-start transition-all duration-200",
+              activeFilter === "credentials"
+                ? "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 shadow-sm"
+                : "hover:bg-gray-100 dark:hover:bg-gray-800 hover:shadow-sm text-amber-600 dark:text-amber-400"
             )}
             onClick={() => onFilterChange("credentials")}
           >
@@ -172,9 +175,10 @@ const Sidebar = ({
           <Button
             variant={activeFilter === "tags" ? "default" : "ghost"}
             className={cn(
-              "w-full justify-start",
-              activeFilter === "tags" &&
-                "bg-gradient-to-r from-purple-500 to-purple-600",
+              "w-full justify-start transition-all duration-200",
+              activeFilter === "tags"
+                ? "bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 shadow-sm"
+                : "hover:bg-gray-100 dark:hover:bg-gray-800 hover:shadow-sm text-purple-600 dark:text-purple-400"
             )}
             onClick={() => onFilterChange("tags")}
           >
@@ -183,40 +187,29 @@ const Sidebar = ({
           </Button>
         </div>
 
-        <Separator className="my-4" />
+        <Separator className="my-4 bg-gray-200/50 dark:bg-gray-700/50" />
 
-        <div className="mb-4">
-          <h3 className="text-sm font-medium mb-3 text-gray-500 dark:text-gray-400 flex items-center">
-            <Bookmark className="h-4 w-4 mr-2" />
-            Recent Tags
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {recentTags.map((tag) => (
-              <Button
-                key={tag.name}
-                variant="outline"
-                size="sm"
-                className={cn(
-                  "h-7 text-xs border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800",
-                  activeFilter === `tag:${tag.name}` &&
-                    "border-primary dark:border-primary bg-primary/10 dark:bg-primary/20",
-                )}
-                onClick={() => onFilterChange(`tag:${tag.name}`)}
-              >
-                {tag.name}
+        {/* Recent Tags Section */}
+        {recentTags.length > 0 && (
+          <div className="py-2">
+            <h3 className="text-sm font-medium px-2 mb-2">Recent Tags</h3>
+            <div className="flex flex-wrap gap-1 px-2">
+              {recentTags.map((tag) => (
                 <Badge
+                  key={tag.name}
                   variant="secondary"
-                  className="ml-1 h-4 px-1 text-[10px]"
+                  className="cursor-pointer hover:bg-accent"
+                  onClick={() => onFilterChange(`tag:${tag.name}`)}
                 >
-                  {tag.count}
+                  {tag.name} ({tag.count})
                 </Badge>
-              </Button>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </ScrollArea>
 
-      <div className="p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/50">
+      <div className="p-4 border-t border-gray-200/50 dark:border-gray-800/50 bg-gray-50/50 dark:bg-gray-900/50 backdrop-blur-sm">
         <Collapsible
           open={isSettingsOpen}
           onOpenChange={setIsSettingsOpen}
@@ -225,21 +218,21 @@ const Sidebar = ({
           <CollapsibleTrigger asChild>
             <Button
               variant="ghost"
-              className="w-full justify-between hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="w-full justify-between hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-200"
             >
               <div className="flex items-center">
                 <Settings className="mr-2 h-4 w-4 text-gray-500" />
                 <span>Settings</span>
               </div>
               {isSettingsOpen ? (
-                <ChevronDown className="h-4 w-4 text-gray-500" />
+                <ChevronDown className="h-4 w-4 text-gray-500 transition-transform duration-200" />
               ) : (
-                <ChevronRight className="h-4 w-4 text-gray-500" />
+                <ChevronRight className="h-4 w-4 text-gray-500 transition-transform duration-200" />
               )}
             </Button>
           </CollapsibleTrigger>
-          <CollapsibleContent className="pt-3 space-y-4">
-            <div className="flex items-center justify-between p-2 rounded-md bg-gray-100 dark:bg-gray-800">
+          <CollapsibleContent className="pt-4 space-y-4">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-gray-100/80 dark:bg-gray-800/80 backdrop-blur-sm">
               <div className="flex items-center space-x-2">
                 {isDarkMode ? (
                   <Moon className="h-4 w-4 text-indigo-400" />
@@ -258,7 +251,7 @@ const Sidebar = ({
               />
             </div>
 
-            <div className="flex items-center justify-between p-2 rounded-md bg-gray-100 dark:bg-gray-800">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-gray-100/80 dark:bg-gray-800/80 backdrop-blur-sm">
               <div className="flex items-center space-x-2">
                 <Database className="h-4 w-4 text-primary" />
                 <Label className="cursor-pointer">Storage: {storageType}</Label>
@@ -267,7 +260,7 @@ const Sidebar = ({
                 variant="outline"
                 size="sm"
                 onClick={handleToggleStorage}
-                className="h-7 text-xs border-primary/50 bg-primary/5 dark:bg-primary/10"
+                className="h-7 text-xs border-primary/50 bg-primary/5 dark:bg-primary/10 hover:bg-primary/10 dark:hover:bg-primary/20"
               >
                 Toggle
               </Button>
@@ -285,9 +278,10 @@ const Sidebar = ({
                     variant="outline"
                     size="sm"
                     className={cn(
-                      "justify-start border bg-white dark:bg-gray-800",
-                      theme.value === "default" &&
-                        "border-primary/50 dark:border-primary/50 bg-primary/5 dark:bg-primary/10",
+                      "justify-start border transition-all duration-200",
+                      theme.value === "default"
+                        ? "border-primary/50 dark:border-primary/50 bg-primary/5 dark:bg-primary/10 hover:bg-primary/10 dark:hover:bg-primary/20"
+                        : "border-gray-200/50 dark:border-gray-700/50 bg-white/80 dark:bg-gray-800/80 hover:bg-gray-50 dark:hover:bg-gray-700/50"
                     )}
                     onClick={() => onColorThemeChange(theme.value)}
                   >

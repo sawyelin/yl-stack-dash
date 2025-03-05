@@ -1,7 +1,6 @@
 import { Suspense } from "react";
-import { useRoutes, Routes, Route } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
 import Home from "./components/home";
-import routes from "tempo-routes";
 import { Toaster } from "@/components/ui/toaster";
 
 function App() {
@@ -10,8 +9,9 @@ function App() {
       <>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/:filter" element={<Home />} />
+          <Route path="/:filter/folder/:folderId" element={<Home />} />
         </Routes>
-        {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
         <Toaster />
       </>
     </Suspense>

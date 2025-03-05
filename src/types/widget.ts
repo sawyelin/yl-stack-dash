@@ -1,0 +1,1 @@
+export type WidgetType = "link" | "note" | "credential" | "tagged" | "all"; 
