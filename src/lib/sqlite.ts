@@ -9,8 +9,8 @@ const isBrowser = typeof window !== "undefined";
 let db: any = null;
 let initialized = false;
 
-// Use localStorage to persist database state
-const DB_STORAGE_KEY = "secure-vault-db";
+// Database file path
+const DB_FILE_PATH = '/db/dashboard.sqlite';
 
 // Helper function to format widget data from DB
 export function formatWidget(data: WidgetData): Widget {
@@ -39,26 +39,19 @@ export async function initDatabase(): Promise<boolean> {
     const sqlPromise = SQL.default({
       locateFile: (file) => `/node_modules/sql.js/dist/${file}`,
     });
-    // Try to load database from localStorage first
-    let initialData = new ArrayBuffer(0);
-    if (isBrowser && localStorage.getItem(DB_STORAGE_KEY)) {
-      try {
-        const storedData = localStorage.getItem(DB_STORAGE_KEY);
-        if (storedData) {
-          const binary = atob(storedData);
-          const bytes = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++) {
-            bytes[i] = binary.charCodeAt(i);
-          }
-          initialData = bytes.buffer;
-        }
-      } catch (e) {
-        console.error("Failed to load database from localStorage:", e);
-      }
-    }
-    const dataPromise = Promise.resolve(initialData);
 
-    const [SQL_js, buf] = await Promise.all([sqlPromise, dataPromise]);
+    // Try to load database from file
+    let initialData = new ArrayBuffer(0);
+    try {
+      const response = await fetch(DB_FILE_PATH);
+      if (response.ok) {
+        initialData = await response.arrayBuffer();
+      }
+    } catch (e) {
+      console.error("Failed to load database from file:", e);
+    }
+
+    const [SQL_js, buf] = await Promise.all([sqlPromise, Promise.resolve(initialData)]);
 
     // Create database from stored data or create new if none exists
     db = new SQL_js.Database(
@@ -77,6 +70,16 @@ export async function initDatabase(): Promise<boolean> {
         isProtected INTEGER DEFAULT 0,
         credentialType TEXT,
         customFields TEXT,
+        folder_id TEXT,
+        createdAt TEXT NOT NULL,
+        updatedAt TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS folders (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL CHECK(type IN ('link', 'note', 'credential', 'tagged', 'all')),
+        parent_id TEXT,
         createdAt TEXT NOT NULL,
         updatedAt TEXT NOT NULL
       );
@@ -88,10 +91,13 @@ export async function initDatabase(): Promise<boolean> {
         createdAt TEXT NOT NULL,
         lastUsed TEXT
       );
+
+      CREATE INDEX IF NOT EXISTS idx_widgets_type ON widgets(type);
+      CREATE INDEX IF NOT EXISTS idx_widgets_folder ON widgets(folder_id);
+      CREATE INDEX IF NOT EXISTS idx_folders_parent ON folders(parent_id);
     `);
 
     // Insert sample data if the database is empty
-    // Check if the widgets table exists and has data
     let count = 0;
     try {
       const result = db.exec("SELECT COUNT(*) FROM widgets");
@@ -113,18 +119,26 @@ export async function initDatabase(): Promise<boolean> {
   }
 }
 
-// Save the database to localStorage
-export function saveDatabase(): Uint8Array | null {
+// Save the database to file
+export async function saveDatabase(): Promise<Uint8Array | null> {
   if (!db || !isBrowser) return null;
 
   try {
     const data = db.export();
-    const binary = String.fromCharCode.apply(null, data);
-    const base64 = btoa(binary);
-    localStorage.setItem(DB_STORAGE_KEY, base64);
+    
+    // Save to file using API endpoint
+    const response = await fetch('/api/save-db', {
+      method: 'POST',
+      body: data,
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save database to file');
+    }
+
     return data;
   } catch (e) {
-    console.error("Failed to save database to localStorage:", e);
+    console.error("Failed to save database to file:", e);
     return null;
   }
 }

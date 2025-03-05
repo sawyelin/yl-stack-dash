@@ -1,5 +1,5 @@
 import React from "react";
-import { Loader2, AlertCircle, RefreshCw, Plus, Sparkles, ChevronLeft, FolderPlus } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw, Plus, Sparkles, ChevronLeft, FolderPlus, LinkIcon, FileText, Key } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -8,6 +8,8 @@ import FolderCard from "../FolderCard";
 import WidgetCard from "../WidgetCard";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import LinkTable from "./widgets/LinkTable";
+import { Search } from "lucide-react";
 
 export type WidgetType = "link" | "note" | "credential" | "tagged";
 type FolderType = WidgetType | "all";
@@ -51,6 +53,7 @@ interface DashboardGridProps {
   selectedFolderId?: string | null;
   isLoading?: boolean;
   onAddItem?: () => void;
+  onFilterChange?: (filter: string) => void;
 }
 
 const DashboardGrid = ({
@@ -68,6 +71,7 @@ const DashboardGrid = ({
   selectedFolderId = null,
   isLoading = false,
   onAddItem = () => {},
+  onFilterChange = () => {},
 }: DashboardGridProps) => {
   // Show folders matching the current filter type when not in a folder
   const getFilteredFolders = () => {
@@ -101,52 +105,18 @@ const DashboardGrid = ({
     return typeMap[filter] || "all";
   };
 
-  // Filter widgets based on selected folder and active filter
-  const getFilteredWidgets = () => {
-    if (!widgets || !Array.isArray(widgets)) return [];
-    let filtered = widgets;
-    
-    // First filter by folder
-    if (selectedFolderId && Array.isArray(folders)) {
-      // Get all descendant folder IDs recursively
-      const getDescendantFolderIds = (folderId: string): string[] => {
-        const directChildren = folders
-          .filter(f => f.parent_id === folderId)
-          .map(f => f.id);
-        
-        const allDescendants = [...directChildren];
-        directChildren.forEach(childId => {
-          allDescendants.push(...getDescendantFolderIds(childId));
-        });
-        
-        return allDescendants;
-      };
+  // Filter widgets based on the current folder and active filter
+  const filteredWidgets = widgets.filter((widget) => {
+    const folderMatch = selectedFolderId ? widget.folder_id === selectedFolderId : !widget.folder_id;
+    const typeMatch = activeFilter === "all" || widget.type === getTypeFromFilter(activeFilter);
+    return folderMatch && typeMatch;
+  });
 
-      // Get all valid folder IDs (current folder and all its descendants)
-      const validFolderIds = [selectedFolderId, ...getDescendantFolderIds(selectedFolderId)];
-      
-      // Filter items that belong to any of these folders
-      filtered = filtered.filter(widget => 
-        validFolderIds.includes(widget.folder_id || "")
-      );
-    } else {
-      // When in root, ONLY show items that have no folder
-      filtered = filtered.filter(widget => !widget.folder_id);
-    }
+  // Separate links from other widgets
+  const linkWidgets = filteredWidgets.filter(widget => widget.type === "link");
+  const otherWidgets = filteredWidgets.filter(widget => widget.type !== "link");
 
-    // Then filter by type
-    if (activeFilter !== "all") {
-      const typeMap: { [key: string]: string } = {
-        "links": "link",
-        "notes": "note",
-        "credentials": "credential",
-        "tags": "tagged"
-      };
-      filtered = filtered.filter(widget => widget.type === typeMap[activeFilter]);
-    }
-
-    return filtered;
-  };
+  const currentFolder = selectedFolderId ? folders.find(f => f.id === selectedFolderId) : null;
 
   // Get item count for each folder
   const getFolderItemCount = (folderId: string) => {
@@ -161,13 +131,9 @@ const DashboardGrid = ({
     ).length;
   };
 
-  const filteredFolders = getFilteredFolders();
-  const filteredWidgets = getFilteredWidgets();
-  const currentFolder = selectedFolderId ? folders.find(f => f.id === selectedFolderId) : null;
-
   if (isLoading) {
     return (
-      <div className="w-full h-full flex items-center justify-center p-8">
+      <div className="w-full h-full flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <div className="animate-spin">
             <Loader2 className="h-8 w-8 text-primary" />
@@ -178,134 +144,127 @@ const DashboardGrid = ({
     );
   }
 
-  // Show empty state when no items and no folders
-  if (!isLoading && filteredWidgets.length === 0 && filteredFolders.length === 0) {
-    return (
-      <div className="w-full h-full flex items-center justify-center p-8">
-        <div className="flex flex-col items-center gap-4 max-w-md text-center">
-          <AlertCircle className="h-12 w-12 text-gray-400" />
-          <div className="space-y-2">
-            <h3 className="text-lg font-medium">No items found</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              {selectedFolderId 
-                ? "This folder is empty. Add some items to get started."
-                : "No items found. Add some items or create folders to get started."}
-            </p>
-            <div className="flex gap-2 justify-center mt-4">
-              <Button onClick={onAddItem} className="gap-2">
-                <Plus className="h-4 w-4" />
-                Add Item
-              </Button>
-              {!selectedFolderId && (
-                <Button onClick={onAddFolder} variant="outline" className="gap-2">
-                  <FolderPlus className="h-4 w-4" />
-                  New Folder
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="w-full h-full flex flex-col gap-4">
-      {/* Header with Action Buttons */}
-      <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 p-4 border-b border-gray-200 dark:border-gray-800">
-        <div className="flex items-center justify-between">
+    <div className="h-full flex flex-col px-6 py-4">
+      <div className="flex-1 max-w-[1400px] w-full mx-auto">
+        {/* Header with folder actions */}
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
-            {selectedFolderId && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => onFolderSelect(null)}
-                className="text-gray-500 hover:text-gray-900 dark:hover:text-gray-100"
-              >
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Back
-              </Button>
-            )}
+            {activeFilter === "links" && <LinkIcon className="h-5 w-5 text-blue-500" />}
+            {activeFilter === "notes" && <FileText className="h-5 w-5 text-green-500" />}
+            {activeFilter === "credentials" && <Key className="h-5 w-5 text-amber-500" />}
             <h2 className="text-lg font-semibold">
-              {selectedFolderId 
-                ? currentFolder?.name
-                : activeFilter === "all" 
-                  ? "All Items" 
-                  : `${activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1)}`}
+              {activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1)}
             </h2>
           </div>
-          <div className="flex gap-2">
-            {!selectedFolderId && (
-              <Button onClick={onAddFolder} variant="outline" size="sm">
-                <Plus className="h-4 w-4 mr-2" />
-                New Folder
+          <div className="flex items-center gap-2">
+            {/* Show Add Item button when inside a folder */}
+            {selectedFolderId && (
+              <Button onClick={onAddItem} variant="default" size="sm" className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add {activeFilter === "links" ? "Link" : 
+                     activeFilter === "notes" ? "Note" : 
+                     activeFilter === "credentials" ? "Credential" : "Item"}
               </Button>
             )}
-            <Button onClick={onAddItem} variant="default" size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              New Item
-            </Button>
+            {/* Show New Folder button only when not in a folder */}
+            {!selectedFolderId && (
+              <Button onClick={onAddFolder} variant="default" size="sm" className="gap-2">
+                <FolderPlus className="h-4 w-4" />
+                New {activeFilter === "all" ? "" : `${activeFilter.slice(0, -1).charAt(0).toUpperCase() + activeFilter.slice(0, -1).slice(1)} `}Folder
+              </Button>
+            )}
           </div>
         </div>
-      </div>
 
-      <div className="flex-1 overflow-auto p-4">
-        {/* Grid Layout */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {/* Show Folders if not inside a folder */}
-          {!selectedFolderId && filteredFolders.map((folder) => (
-            <FolderCard
-              key={folder.id}
-              id={folder.id}
-              name={folder.name}
-              type={folder.type}
-              itemCount={getFolderItemCount(folder.id)}
-              isSelected={selectedFolderId === folder.id}
-              onSelect={onFolderSelect}
-              onEdit={() => onFolderEdit(folder)}
-              onDelete={() => onFolderDelete(folder.id)}
-            />
-          ))}
+        {/* Folders grid if any */}
+        {getFilteredFolders().length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
+            {getFilteredFolders().map((folder) => (
+              <FolderCard
+                key={folder.id}
+                id={folder.id}
+                name={folder.name}
+                type={folder.type}
+                itemCount={getFolderItemCount(folder.id)}
+                isSelected={folder.id === selectedFolderId}
+                onSelect={onFolderSelect}
+                onEdit={() => onFolderEdit(folder)}
+                onDelete={() => onFolderDelete(folder.id)}
+              />
+            ))}
+          </div>
+        )}
 
-          {/* Show Items */}
-          <DragDropContext onDragEnd={onWidgetMove}>
-            <Droppable droppableId="dashboard" direction="horizontal">
-              {(provided) => (
-                <div
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  className="contents"
-                >
-                  {filteredWidgets.map((widget, index) => (
-                    <Draggable key={widget.id} draggableId={widget.id} index={index}>
-                      {(provided) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          {...provided.dragHandleProps}
-                        >
-                          <WidgetCard
-                            id={widget.id}
-                            title={widget.title}
-                            content={widget.content}
-                            type={widget.type}
-                            tags={widget.tags}
-                            url={widget.url}
-                            isProtected={widget.isProtected}
-                            onEdit={() => onWidgetEdit(widget)}
-                            onDelete={() => onWidgetDelete(widget)}
-                            onView={() => onWidgetView(widget)}
-                          />
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
-                  {provided.placeholder}
+        {/* Links view */}
+        {activeFilter === "links" && (
+          <>
+            {selectedFolderId ? (
+              // Show table view in folders
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-2">
+                    <LinkIcon className="h-5 w-5 text-blue-500" />
+                    <h2 className="text-lg font-semibold">Links</h2>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      {linkWidgets.length} {linkWidgets.length === 1 ? 'item' : 'items'}
+                    </span>
+                  </div>
                 </div>
-              )}
-            </Droppable>
-          </DragDropContext>
-        </div>
+                <LinkTable
+                  widgets={linkWidgets}
+                  onWidgetEdit={onWidgetEdit}
+                  onWidgetDelete={onWidgetDelete}
+                />
+              </div>
+            ) : (
+              // Show grid view in main view
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {linkWidgets.map((widget) => (
+                  <WidgetCard
+                    key={widget.id}
+                    {...widget}
+                    onEdit={() => onWidgetEdit(widget)}
+                    onDelete={() => onWidgetDelete(widget)}
+                    onView={() => onWidgetView(widget)}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Other widgets grid */}
+        {activeFilter !== "links" && otherWidgets.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {otherWidgets.map((widget) => (
+              <WidgetCard
+                key={widget.id}
+                {...widget}
+                onEdit={() => onWidgetEdit(widget)}
+                onDelete={() => onWidgetDelete(widget)}
+                onView={() => onWidgetView(widget)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Empty state - only show when no folders and no items */}
+        {filteredWidgets.length === 0 && getFilteredFolders().length === 0 && !isLoading && (
+          <div className="flex flex-col items-center justify-center min-h-[400px]">
+            <div className="text-center max-w-md">
+              <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">Get Started</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                Create your first {activeFilter === "all" ? "folder" : `${activeFilter.slice(0, -1)} folder`} to get started
+              </p>
+              <Button onClick={onAddFolder} variant="default" className="gap-2">
+                <FolderPlus className="h-4 w-4" />
+                New {activeFilter === "all" ? "" : `${activeFilter.slice(0, -1).charAt(0).toUpperCase() + activeFilter.slice(0, -1).slice(1)} `}Folder
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
