@@ -1,0 +1,7 @@
+name = "yl-stack-dash"
+compatibility_date = "2024-03-05"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "personel-db"
+database_id = "517aa13b-4c5e-4436-a76c-3be27d10e7f6" # Run 'npx wrangler d1 list' to get your database ID 

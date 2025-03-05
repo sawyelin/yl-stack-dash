@@ -1,19 +1,17 @@
 // Storage utility to determine which database to use
 import { Widget } from "@/components/dashboard/DashboardGrid";
 import { WidgetData } from "@/services/widgetService";
-import * as cloudflareDB from "./cloudflare";
 import * as sqliteDB from "./sqlite";
 
 // Environment variables
 const USE_LOCAL_STORAGE = import.meta.env.VITE_USE_LOCAL_STORAGE === "true";
 const CF_API_URL = import.meta.env.VITE_CF_API_URL;
-const CF_API_TOKEN = import.meta.env.VITE_CF_API_TOKEN;
 
 // Determine if we should use local storage
 let useLocalStorage = USE_LOCAL_STORAGE;
 
-// If Cloudflare credentials are not configured, force local storage
-if (!CF_API_URL || !CF_API_TOKEN) {
+// If API URL is not configured, force local storage
+if (!CF_API_URL) {
   useLocalStorage = true;
 }
 
@@ -34,7 +32,21 @@ export async function queryStorage<T>(
       const results = await sqliteDB.queryWidgets(query, params);
       return { success: true, results: results as unknown as T[] };
     } else {
-      return await cloudflareDB.queryD1<T>(query, params);
+      // Cloudflare D1 API call
+      const response = await fetch(`${CF_API_URL}/query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query, params }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to query D1 database');
+      }
+
+      const data = await response.json();
+      return { success: true, results: data.results };
     }
   } catch (error) {
     return {
@@ -54,7 +66,21 @@ export async function executeStorage<T>(
       const success = await sqliteDB.executeWidgets(query, params);
       return { success };
     } else {
-      return await cloudflareDB.executeD1<T>(query, params);
+      // Cloudflare D1 API call
+      const response = await fetch(`${CF_API_URL}/execute`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query, params }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to execute D1 database operation');
+      }
+
+      const data = await response.json();
+      return { success: true, results: data.results };
     }
   } catch (error) {
     return {

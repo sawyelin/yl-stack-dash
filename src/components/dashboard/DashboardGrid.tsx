@@ -154,7 +154,7 @@ const DashboardGrid = ({
             {activeFilter === "notes" && <FileText className="h-5 w-5 text-green-500" />}
             {activeFilter === "credentials" && <Key className="h-5 w-5 text-amber-500" />}
             <h2 className="text-lg font-semibold">
-              {activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1)}
+              {currentFolder ? currentFolder.name : activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1)}
             </h2>
           </div>
           <div className="flex items-center gap-2">
@@ -177,79 +177,98 @@ const DashboardGrid = ({
           </div>
         </div>
 
-        {/* Folders grid if any */}
+        {/* Folders grid */}
         {getFilteredFolders().length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
-            {getFilteredFolders().map((folder) => (
-              <FolderCard
-                key={folder.id}
-                id={folder.id}
-                name={folder.name}
-                type={folder.type}
-                itemCount={getFolderItemCount(folder.id)}
-                isSelected={folder.id === selectedFolderId}
-                onSelect={onFolderSelect}
-                onEdit={() => onFolderEdit(folder)}
-                onDelete={() => onFolderDelete(folder.id)}
-              />
-            ))}
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {getFilteredFolders().map((folder) => (
+                <FolderCard
+                  key={folder.id}
+                  id={folder.id}
+                  name={folder.name}
+                  type={folder.type}
+                  itemCount={getFolderItemCount(folder.id)}
+                  isSelected={folder.id === selectedFolderId}
+                  onSelect={onFolderSelect}
+                  onEdit={() => onFolderEdit(folder)}
+                  onDelete={() => onFolderDelete(folder.id)}
+                />
+              ))}
+            </div>
           </div>
         )}
 
-        {/* Links view */}
-        {activeFilter === "links" && (
-          <>
-            {selectedFolderId ? (
-              // Show table view in folders
-              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                  <div className="flex items-center gap-2">
-                    <LinkIcon className="h-5 w-5 text-blue-500" />
-                    <h2 className="text-lg font-semibold">Links</h2>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      {linkWidgets.length} {linkWidgets.length === 1 ? 'item' : 'items'}
-                    </span>
+        {/* Content Area */}
+        <div className={cn("space-y-4", getFilteredFolders().length > 0 && "mt-6")}>
+          {/* Links Section */}
+          {(activeFilter === "links" || activeFilter === "all") && linkWidgets.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+              {selectedFolderId ? (
+                <>
+                  <LinkTable
+                    widgets={linkWidgets}
+                    onWidgetEdit={onWidgetEdit}
+                    onWidgetDelete={onWidgetDelete}
+                  />
+                </>
+              ) : (
+                <div className="p-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {linkWidgets.map((widget) => (
+                      <WidgetCard
+                        key={widget.id}
+                        {...widget}
+                        onEdit={() => onWidgetEdit(widget)}
+                        onDelete={() => onWidgetDelete(widget)}
+                        onView={() => onWidgetView(widget)}
+                      />
+                    ))}
                   </div>
                 </div>
-                <LinkTable
-                  widgets={linkWidgets}
-                  onWidgetEdit={onWidgetEdit}
-                  onWidgetDelete={onWidgetDelete}
-                />
-              </div>
-            ) : (
-              // Show grid view in main view
+              )}
+            </div>
+          )}
+
+          {/* Notes Section */}
+          {(activeFilter === "notes" || activeFilter === "all") && otherWidgets.filter(w => w.type === "note").length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {linkWidgets.map((widget) => (
-                  <WidgetCard
-                    key={widget.id}
-                    {...widget}
-                    onEdit={() => onWidgetEdit(widget)}
-                    onDelete={() => onWidgetDelete(widget)}
-                    onView={() => onWidgetView(widget)}
-                  />
-                ))}
+                {otherWidgets
+                  .filter(widget => widget.type === "note")
+                  .map((widget) => (
+                    <WidgetCard
+                      key={widget.id}
+                      {...widget}
+                      onEdit={() => onWidgetEdit(widget)}
+                      onDelete={() => onWidgetDelete(widget)}
+                      onView={() => onWidgetView(widget)}
+                    />
+                  ))}
               </div>
-            )}
-          </>
-        )}
+            </div>
+          )}
 
-        {/* Other widgets grid */}
-        {activeFilter !== "links" && otherWidgets.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {otherWidgets.map((widget) => (
-              <WidgetCard
-                key={widget.id}
-                {...widget}
-                onEdit={() => onWidgetEdit(widget)}
-                onDelete={() => onWidgetDelete(widget)}
-                onView={() => onWidgetView(widget)}
-              />
-            ))}
-          </div>
-        )}
+          {/* Credentials Section */}
+          {(activeFilter === "credentials" || activeFilter === "all") && otherWidgets.filter(w => w.type === "credential").length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {otherWidgets
+                  .filter(widget => widget.type === "credential")
+                  .map((widget) => (
+                    <WidgetCard
+                      key={widget.id}
+                      {...widget}
+                      onEdit={() => onWidgetEdit(widget)}
+                      onDelete={() => onWidgetDelete(widget)}
+                      onView={() => onWidgetView(widget)}
+                    />
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
 
-        {/* Empty state - only show when no folders and no items */}
+        {/* Empty state */}
         {filteredWidgets.length === 0 && getFilteredFolders().length === 0 && !isLoading && (
           <div className="flex flex-col items-center justify-center min-h-[400px]">
             <div className="text-center max-w-md">
